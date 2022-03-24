@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -1094,6 +1095,125 @@ func (d *DotGit) PackRefs() (err error) {
 	}
 
 	return nil
+}
+
+func (d *DotGit) Reflog(ref plumbing.ReferenceName) ([]*plumbing.ReflogEntry, error) {
+	if ref != plumbing.HEAD {
+		return nil, errors.New("reflog for other references than HEAD is not implemented")
+	}
+
+	path := d.fs.Join(logsPath, plumbing.HEAD.String())
+	f, err := d.fs.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	r := bufio.NewReader(f)
+	entries := make([]*plumbing.ReflogEntry, 0, 100)
+
+	for {
+		s, err := r.ReadString(' ')
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		oh := plumbing.NewHash(s[:len(s)-1])
+
+		s, err = r.ReadString(' ')
+		if err == io.EOF {
+			break // FIXME unexpected EOF
+		}
+		if err != nil {
+			return nil, err
+		}
+		nh := plumbing.NewHash(s[:len(s)-1])
+
+		s, err = r.ReadString('<')
+		if err == io.EOF {
+			break // FIXME unexpected EOF
+		}
+		if err != nil {
+			return nil, err
+		}
+		name := s[:len(s)-2]
+
+		s, err = r.ReadString('>')
+		if err == io.EOF {
+			break // FIXME unexpected EOF
+		}
+		if err != nil {
+			return nil, err
+		}
+		email := s[:len(s)-1]
+
+		_, err = r.Discard(1)
+		if err == io.EOF {
+			break // FIXME unexpected EOF
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		s, err = r.ReadString(' ')
+		if err == io.EOF {
+			break // FIXME unexpected EOF
+		}
+		if err != nil {
+			return nil, err
+		}
+		ts, err := strconv.ParseInt(s[:len(s)-1], 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		when := time.Unix(ts, 0)
+
+		s, err = r.ReadString('\t')
+		if err == io.EOF {
+			break // FIXME unexpected EOF
+		}
+		if err != nil {
+			return nil, err
+		}
+		t, err := time.Parse("2006-01-02 15:04:05 -0700", "0000-01-01 00:00:00 "+s[:len(s)-1])
+		if err != nil {
+			return nil, err
+		}
+		when = when.In(t.Location())
+
+		s, err = r.ReadString('\n')
+		if err == io.EOF {
+			break // FIXME unexpected EOF
+		}
+		if err != nil {
+			return nil, err
+		}
+		message := s[:len(s)-1]
+
+		entries = append(entries, &plumbing.ReflogEntry{
+			Reference: ref,
+			OldHash:   oh,
+			NewHash:   nh,
+			Author: plumbing.Signature{
+				Name:  name,
+				Email: email,
+				When:  when,
+			},
+			Message: plumbing.ReflogEntryMessage(message),
+		})
+	}
+
+	l := len(entries)
+	for i := 0; i < l/2; i++ {
+		entries[i], entries[l-i-1] = entries[l-i-1], entries[i]
+	}
+	for i := 0; i < l; i++ {
+		entries[i].Index = i
+	}
+
+	return entries, nil
 }
 
 // Module return a billy.Filesystem pointing to the module folder

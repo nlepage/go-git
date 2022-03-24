@@ -668,3 +668,9 @@ type PlainOpenOptions struct {
 
 // Validate validates the fields and sets the default values.
 func (o *PlainOpenOptions) Validate() error { return nil }
+
+type RefLogOptions struct {
+	ReferenceName plumbing.ReferenceName
+}
+
+func (o *RefLogOptions) Validate() error { return nil }

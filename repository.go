@@ -57,6 +57,7 @@ var (
 	ErrIsBareRepository          = errors.New("worktree not available in a bare repository")
 	ErrUnableToResolveCommit     = errors.New("unable to resolve commit")
 	ErrPackedObjectsNotSupported = errors.New("packed objects not supported")
+	ErrReflogNotSupported        = errors.New("reflog not supported")
 )
 
 // Repository represents a git repository
@@ -1643,6 +1644,20 @@ func (r *Repository) RepackObjects(cfg *RepackConfig) (err error) {
 	}
 
 	return nil
+}
+
+func (r *Repository) RefLog(o *RefLogOptions) (storer.ReflogIter, error) {
+	rs, ok := r.Storer.(storer.ReflogStorer)
+	if !ok {
+		return nil, ErrPackedObjectsNotSupported
+	}
+
+	ref := o.ReferenceName
+	if ref == "" {
+		ref = plumbing.HEAD
+	}
+
+	return rs.IterReflog(ref)
 }
 
 // createNewObjectPack is a helper for RepackObjects taking care

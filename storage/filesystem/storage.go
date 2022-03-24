@@ -21,6 +21,7 @@ type Storage struct {
 	ShallowStorage
 	ConfigStorage
 	ModuleStorage
+	ReflogStorage
 }
 
 // Options holds configuration for the storage.
@@ -62,6 +63,7 @@ func NewStorageWithOptions(fs billy.Filesystem, cache cache.Object, ops Options)
 		ShallowStorage:   ShallowStorage{dir: dir},
 		ConfigStorage:    ConfigStorage{dir: dir},
 		ModuleStorage:    ModuleStorage{dir: dir},
+		ReflogStorage:    ReflogStorage{dir: dir},
 	}
 }
 
